@@ -1,6 +1,9 @@
 import argparse
+import copy
 import csv
 from datetime import date
+
+MONTH_BY_SECOND = 2 * 30 * 24 * 60 * 60
 
 
 def main(inputfile=None, outputfile=None):
@@ -14,7 +17,7 @@ def main(inputfile=None, outputfile=None):
 
     emails = []
     c_emails = dict(
-        redhat=[], google=[], amazon=[], facebook=[], apple=[], microsoft=[], ibm=[], vmware=[], intel=[], huawei=[], others=[]
+        google={}, redhat={}, huawei={}, fujitsu={}, ibm={}, vmware={}, intel={}, microsoft={}, amazon={}, apple={}, facebook={}, others={}
     )
     last = None
     companies = list(c_emails.keys())
@@ -27,6 +30,11 @@ def main(inputfile=None, outputfile=None):
         _date = date.fromtimestamp(epoc)
         _month = _date.strftime("%Y/%m")
         if isinstance(last, str) and last != _month:
+            c_emails_copy = copy.deepcopy(c_emails)
+            for c in companies:
+                for _email, _epoc in c_emails_copy[c].items():
+                    if _epoc < epoc - MONTH_BY_SECOND:
+                        del(c_emails[c][_email])
             print(last, len(emails), [(x, len(y)) for x, y in c_emails.items()])
             writer.writerow([last] + [len(y) for x, y in c_emails.items()])
             # print(c_emails)
@@ -44,12 +52,11 @@ def main(inputfile=None, outputfile=None):
         domains = mx.split(".")
         for c in companies:
             if c in domains:
-                if email not in c_emails[c]:
-                    c_emails[c].append(email)
+                c_emails[c][email] = epoc
                 break
         else:
-            if email not in c_emails["others"]:
-                c_emails["others"].append(email)
+            c_emails["others"][email] = epoc
+
 
     print(last, len(emails), [(x, len(y)) for x, y in c_emails.items()])
     writer.writerow([last] + [len(y) for x, y in c_emails.items()])
