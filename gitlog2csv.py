@@ -31,7 +31,7 @@ def main(inputfile=None, outputfile=None):
         _month = _date.strftime("%Y/%m")
         if isinstance(last, str) and last != _month:
             c_emails_copy = copy.deepcopy(c_emails)
-            for c in companies:
+            for c in c_emails_copy.keys():
                 for _email, _epoc in c_emails_copy[c].items():
                     if _epoc < epoc - MONTH_BY_SECOND:
                         del(c_emails[c][_email])
@@ -58,6 +58,11 @@ def main(inputfile=None, outputfile=None):
             c_emails["others"][email] = epoc
 
 
+    c_emails_copy = copy.deepcopy(c_emails)
+    for c in c_emails_copy.keys():
+        for _email, _epoc in c_emails_copy[c].items():
+            if _epoc < epoc - MONTH_BY_SECOND:
+                del(c_emails[c][_email])
     print(last, len(emails), [(x, len(y)) for x, y in c_emails.items()])
     writer.writerow([last] + [len(y) for x, y in c_emails.items()])
     outputfile.close()        
