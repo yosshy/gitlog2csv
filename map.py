@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import argparse
 from datetime import datetime
 import pickle
@@ -6,6 +8,7 @@ import re
 FROM_UNTIL_PATTERN = re.compile(r"(.*) from (.*) until (.*)")
 FROM_PATTERN = re.compile(r"(.*) from (.*)")
 UNTIL_PATTERN = re.compile(r"(.*) until (.*)")
+
 
 def main(inputfiles=None):
     print(inputfiles)
@@ -74,6 +77,8 @@ def main(inputfiles=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("inputfiles", type=argparse.FileType("r", encoding="utf8"), nargs="+")
+    parser.add_argument(
+        "inputfiles", type=argparse.FileType("r", encoding="utf8"), nargs="+"
+    )
     args = parser.parse_args()
     main(**args.__dict__)
