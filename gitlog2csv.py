@@ -1,8 +1,13 @@
+#!/usr/bin/python3
+
 import argparse
 import copy
 import csv
 from datetime import date
+import os.path
 import pickle
+
+import git
 
 MONTH_BY_SECOND = 2 * 30 * 24 * 60 * 60
 
@@ -28,30 +33,23 @@ COMPANY_MAP = {
 }
 
 
-def main(inputfile=None, outputfile=None, emailmapfile=None, companymapfile=None):
-    emailmap = {}
-    companymap = {}
-    if emailmapfile:
-        emailmap = pickle.load(emailmapfile)
-        print(len(emailmap))
-        # print(emailmap.keys())
-    if companymapfile:
-        companymap = pickle.load(companymapfile)
-        print(len(companymap))
-
-    source = []
-    for line in inputfile.readlines():
-        try:
-            epoc, email = line.strip().split(" ")
-            # print(epoc, email)
-            source.append((int(epoc), email.lower()))
-        except:
-            pass
-    source = sorted(source, key=lambda x: x[0])
+def parse(commits=None, outputfile=None, emailmap=None, companymap=None):
 
     emails = []
     c_emails = dict(
-        google={}, redhat={}, huawei={}, fujitsu={}, ibm={}, vmware={}, intel={}, microsoft={}, amazon={}, apple={}, facebook={}, nec={}, others={}
+        google={},
+        redhat={},
+        huawei={},
+        fujitsu={},
+        ibm={},
+        vmware={},
+        intel={},
+        microsoft={},
+        amazon={},
+        apple={},
+        facebook={},
+        nec={},
+        others={},
     )
     last = None
     companies = list(c_emails.keys())
@@ -60,19 +58,18 @@ def main(inputfile=None, outputfile=None, emailmapfile=None, companymapfile=None
     writer = csv.writer(outputfile, quoting=csv.QUOTE_MINIMAL)
     writer.writerow(["month"] + list(c_emails.keys()))
 
-    for epoc, email in source:
+    for commit in commits:
+        epoc = commit.committed_datetime.timestamp()
+        email = commit.author.email
         _company = None
-        # print(email)
         if email in emailmap:
             account = emailmap[email]
-            # print(account)
             if account in companymap:
                 for _company, _from, _until in companymap[account]:
                     if _from <= epoc <= _until:
                         break
                 else:
                     _company = None
-        # print(_company)
 
         _date = date.fromtimestamp(epoc)
         _month = _date.strftime("%Y/%m")
@@ -81,10 +78,9 @@ def main(inputfile=None, outputfile=None, emailmapfile=None, companymapfile=None
             for c in c_emails_copy.keys():
                 for _email, _epoc in c_emails_copy[c].items():
                     if _epoc < epoc - MONTH_BY_SECOND:
-                        del(c_emails[c][_email])
-            print(last, len(emails), [(x, len(y)) for x, y in c_emails.items()])
+                        del c_emails[c][_email]
+            print(last, [(x, len(y)) for x, y in c_emails.items()])
             writer.writerow([last] + [len(y) for x, y in c_emails.items()])
-            # print(c_emails)
         last = _month
 
         # Total count
@@ -114,16 +110,54 @@ def main(inputfile=None, outputfile=None, emailmapfile=None, companymapfile=None
     for c in c_emails_copy.keys():
         for _email, _epoc in c_emails_copy[c].items():
             if _epoc < epoc - MONTH_BY_SECOND:
-                del(c_emails[c][_email])
-    print(last, len(emails), [(x, len(y)) for x, y in c_emails.items()])
+                del c_emails[c][_email]
+    print(last, [(x, len(y)) for x, y in c_emails.items()])
     writer.writerow([last] + [len(y) for x, y in c_emails.items()])
-    outputfile.close()        
+    outputfile.close()
+
+
+def main(repo_dirs=None, outputfile=None, emailmapfile=None, companymapfile=None):
+    emailmap = {}
+    companymap = {}
+    all_commits = []
+    if emailmapfile:
+        emailmap = pickle.load(emailmapfile)
+        print(len(emailmap))
+    if companymapfile:
+        companymap = pickle.load(companymapfile)
+        print(len(companymap))
+
+    for repo_dir in repo_dirs:
+        if not os.path.isdir(repo_dir):
+            continue
+        print(repo_dir)
+        repo = git.Repo(repo_dir)
+        try:
+            commits = [x for x in repo.iter_commits("master")]
+        except Exception as e:
+            try:
+                commits = [x for x in repo.iter_commits("main")]
+            except:
+                print(str(e))
+                continue
+        commits.sort(key=lambda x: x.committed_datetime)
+        with open(repo_dir + ".csv", "w") as f:
+            parse(commits, f, emailmap, companymap)
+        all_commits += commits
+    all_commits.sort(key=lambda x: x.committed_datetime)
+    print("ALL REPOS")
+    parse(all_commits, outputfile, emailmap, companymap)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("inputfile", type=argparse.FileType("r", encoding="utf8"))
+    parser.add_argument("repo_dirs", nargs="+")
     parser.add_argument("outputfile", type=argparse.FileType("w", encoding="utf8"))
-    parser.add_argument("-c", "--companymapfile", dest="companymapfile", type=argparse.FileType("rb"))
-    parser.add_argument("-e", "--emailmapfile", dest="emailmapfile", type=argparse.FileType("rb"))
+    parser.add_argument(
+        "-c", "--companymapfile", dest="companymapfile", type=argparse.FileType("rb")
+    )
+    parser.add_argument(
+        "-e", "--emailmapfile", dest="emailmapfile", type=argparse.FileType("rb")
+    )
     args = parser.parse_args()
     main(**args.__dict__)
